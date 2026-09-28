@@ -12,6 +12,24 @@ on:
         type: string
         default: "dev"
 
+  workflow_dispatch:
+    inputs:
+      upload-artifact:
+        description: "Upload build artifacts"
+        type: boolean
+        default: true
+        required: false
+      tag-name:
+        description: "Tag name"
+        type: string
+        default: "draft"
+        required: false
+      channel:
+        description: "Build channel"
+        type: string
+        default: "dev"
+        required: false
+
 env:
   IS_GITHUB_ACTIONS: 1
   CHANNEL: "${{ inputs.channel }}"
