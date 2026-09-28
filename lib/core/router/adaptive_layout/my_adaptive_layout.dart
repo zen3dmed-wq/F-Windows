@@ -1,13 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hiddify/core/localization/translations.dart';
-import 'package:hiddify/core/model/constants.dart';
-import 'package:hiddify/core/router/adaptive_layout/shell_route_action.dart';
-import 'package:hiddify/core/router/go_router/helper/active_breakpoint_notifier.dart';
-import 'package:hiddify/core/router/go_router/routing_config_notifier.dart';
-import 'package:hiddify/features/stats/widget/side_bar_stats_overview.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class MyAdaptiveLayout extends HookConsumerWidget {
@@ -17,97 +10,343 @@ class MyAdaptiveLayout extends HookConsumerWidget {
     required this.isMobileBreakpoint,
     required this.showProfilesAction,
   });
-  // managed by go router(Shell Route)
+
   final StatefulNavigationShell navigationShell;
   final bool isMobileBreakpoint;
   final bool showProfilesAction;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final t = ref.watch(translationsProvider).requireValue;
-    // focus switch management
-    final primaryFocusHash = useState<int?>(null);
-    final navScopeNode = useFocusScopeNode();
-    useEffect(() {
-      bool handler(KeyEvent event) {
-        final arrows = isMobileBreakpoint ? KeyboardConst.verticalArrows : KeyboardConst.horizontalArrows;
-        if (!arrows.contains(event.logicalKey)) return false;
-        if (event is KeyDownEvent) {
-          primaryFocusHash.value = FocusManager.instance.primaryFocus.hashCode;
-        } else {
-          // focus node does not change => true.
-          if (primaryFocusHash.value == FocusManager.instance.primaryFocus.hashCode) {
-            if (branchesScope.values.any((node) => node.hasFocus)) {
-              navScopeNode.requestFocus();
-            } else if (navScopeNode.hasFocus) {
-              branchesScope[getNameOfBranch(isMobileBreakpoint, showProfilesAction, navigationShell.currentIndex)]
-                  ?.requestFocus();
-            }
-          }
-        }
-        return true;
-      }
+    final section = useState(0);
 
-      HardwareKeyboard.instance.addHandler(handler);
-      return () {
-        HardwareKeyboard.instance.removeHandler(handler);
-      };
-    }, [isMobileBreakpoint, showProfilesAction, navigationShell.currentIndex]);
+    final entries = const <_FlintNavEntry>[
+      _FlintNavEntry(Icons.home_rounded, 'Главная'),
+      _FlintNavEntry(Icons.tune_rounded, 'Настройки'),
+      _FlintNavEntry(Icons.support_agent_rounded, 'Поддержка'),
+    ];
+
+    final content = switch (section.value) {
+      1 => const _FlintSettingsPage(),
+      2 => const _FlintSupportPage(),
+      _ => navigationShell,
+    };
+
     return Material(
+      color: const Color(0xFF07111F),
       child: Scaffold(
+        backgroundColor: Colors.transparent,
         body: isMobileBreakpoint
-            ? navigationShell
+            ? content
             : Row(
                 children: [
-                  FocusScope(
-                    node: navScopeNode,
-                    child: NavigationRail(
-                      extended: Breakpoint(context).isDesktop(),
-                      destinations: _navRailDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
-                      selectedIndex: navigationShell.currentIndex,
-                      onDestinationSelected: (index) => _onTap(context, index),
-                      trailing: Breakpoint(context).isDesktop()
-                          ? const Expanded(
-                              child: Align(
-                                alignment: Alignment.bottomCenter,
-                                child: SizedBox(width: 220, child: SideBarStatsOverview()),
+                  Container(
+                    width: 218,
+                    decoration: const BoxDecoration(
+                      color: Color(0xF00A1626),
+                      border: Border(
+                        right: BorderSide(color: Color(0x1AFFFFFF)),
+                      ),
+                    ),
+                    child: SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 10),
+                              child: Row(
+                                children: [
+                                  _FlintMark(),
+                                  SizedBox(width: 10),
+                                  Text(
+                                    'FLINT',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 19,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 2.0,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            )
-                          : null,
+                            ),
+                            const SizedBox(height: 34),
+                            for (var i = 0; i < entries.length; i++) ...[
+                              _FlintNavButton(
+                                entry: entries[i],
+                                selected: section.value == i,
+                                onTap: () {
+                                  section.value = i;
+                                  if (i == 0) {
+                                    navigationShell.goBranch(0, initialLocation: false);
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                            const Spacer(),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 10),
+                              child: Text(
+                                'Ваша приватность\nв надежных лапах',
+                                style: TextStyle(
+                                  color: Color(0xFF8391A7),
+                                  height: 1.45,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                  Expanded(child: navigationShell),
+                  Expanded(child: content),
                 ],
               ),
         bottomNavigationBar: isMobileBreakpoint
-            ? FocusScope(
-                node: navScopeNode,
+            ? Container(
+                decoration: const BoxDecoration(
+                  color: Color(0xFF0B1728),
+                  border: Border(top: BorderSide(color: Color(0x1AFFFFFF))),
+                ),
                 child: NavigationBar(
-                  selectedIndex: navigationShell.currentIndex <= 1 ? navigationShell.currentIndex : 0,
-                  destinations: _navDests(_actions(t, showProfilesAction, isMobileBreakpoint)),
-                  onDestinationSelected: (index) => _onTap(context, index),
+                  backgroundColor: Colors.transparent,
+                  indicatorColor: const Color(0xFF1F6FEB),
+                  selectedIndex: section.value,
+                  destinations: entries
+                      .map((e) => NavigationDestination(icon: Icon(e.icon), label: e.label))
+                      .toList(),
+                  onDestinationSelected: (index) {
+                    section.value = index;
+                    if (index == 0) {
+                      navigationShell.goBranch(0, initialLocation: false);
+                    }
+                  },
                 ),
               )
             : null,
       ),
     );
   }
+}
 
-  // shell route action onTap
-  void _onTap(BuildContext context, int index) {
-    navigationShell.goBranch(index, initialLocation: index == navigationShell.currentIndex);
+class _FlintNavEntry {
+  const _FlintNavEntry(this.icon, this.label);
+  final IconData icon;
+  final String label;
+}
+
+class _FlintNavButton extends StatelessWidget {
+  const _FlintNavButton({
+    required this.entry,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _FlintNavEntry entry;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? const Color(0xFF153154) : Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          child: Row(
+            children: [
+              Icon(
+                entry.icon,
+                color: selected ? const Color(0xFF69A8FF) : const Color(0xFF8391A7),
+                size: 21,
+              ),
+              const SizedBox(width: 13),
+              Text(
+                entry.label,
+                style: TextStyle(
+                  color: selected ? Colors.white : const Color(0xFFB7C1D1),
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
+}
 
-  List<ShellRouteAction> _actions(Translations t, bool showProfilesAction, bool isMobileBreakpoint) => [
-    ShellRouteAction(Icons.power_settings_new_rounded, t.pages.home.title),
-    if (showProfilesAction && !isMobileBreakpoint) ShellRouteAction(Icons.view_list_rounded, t.pages.profiles.title),
-    ShellRouteAction(Icons.settings_rounded, t.pages.settings.title),
-    if (!isMobileBreakpoint) ShellRouteAction(Icons.description_rounded, t.pages.logs.title),
-    if (!isMobileBreakpoint) ShellRouteAction(Icons.info_rounded, t.pages.about.title),
-  ];
+class _FlintMark extends StatelessWidget {
+  const _FlintMark();
 
-  List<NavigationDestination> _navDests(List<ShellRouteAction> actions) =>
-      actions.map((e) => NavigationDestination(icon: Icon(e.icon), label: e.title)).toList();
-  List<NavigationRailDestination> _navRailDests(List<ShellRouteAction> actions) =>
-      actions.map((e) => NavigationRailDestination(icon: Icon(e.icon), label: Text(e.title))).toList();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 35,
+      height: 35,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1F6FEB),
+        borderRadius: BorderRadius.circular(11),
+        boxShadow: const [
+          BoxShadow(color: Color(0x441F6FEB), blurRadius: 16, spreadRadius: 1),
+        ],
+      ),
+      child: const Icon(Icons.pets_rounded, color: Colors.white, size: 20),
+    );
+  }
+}
+
+class _FlintSettingsPage extends StatelessWidget {
+  const _FlintSettingsPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _FlintStaticPage(
+      title: 'Настройки Flint',
+      subtitle: 'Только основные параметры клиента',
+      children: [
+        _FlintStaticCard(
+          icon: Icons.shield_outlined,
+          title: 'Flint Guard',
+          subtitle: 'Контроль состояния соединения и автоматическое восстановление',
+        ),
+        _FlintStaticCard(
+          icon: Icons.alt_route_rounded,
+          title: 'RU Direct',
+          subtitle: 'Российские ресурсы напрямую, остальной трафик через Flint',
+        ),
+        _FlintStaticCard(
+          icon: Icons.power_settings_new_rounded,
+          title: 'Автозапуск',
+          subtitle: 'Запуск Flint вместе с Windows',
+        ),
+      ],
+    );
+  }
+}
+
+class _FlintSupportPage extends StatelessWidget {
+  const _FlintSupportPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const _FlintStaticPage(
+      title: 'Онлайн поддержка',
+      subtitle: 'Помощь без лишних технических экранов',
+      children: [
+        _FlintStaticCard(
+          icon: Icons.chat_bubble_outline_rounded,
+          title: 'Чат поддержки',
+          subtitle: 'Канал поддержки подключается через Flint API',
+        ),
+        _FlintStaticCard(
+          icon: Icons.info_outline_rounded,
+          title: 'О приложении',
+          subtitle: 'Flint — Ваша приватность в надежных лапах',
+        ),
+      ],
+    );
+  }
+}
+
+class _FlintStaticPage extends StatelessWidget {
+  const _FlintStaticPage({
+    required this.title,
+    required this.subtitle,
+    required this.children,
+  });
+
+  final String title;
+  final String subtitle;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF07111F), Color(0xFF0D2038)],
+        ),
+      ),
+      child: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(34),
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              subtitle,
+              style: const TextStyle(color: Color(0xFF8391A7), fontSize: 14),
+            ),
+            const SizedBox(height: 28),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FlintStaticCard extends StatelessWidget {
+  const _FlintStaticCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xCC101F33),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0x1FFFFFFF)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFF173459),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(icon, color: const Color(0xFF69A8FF)),
+          ),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 4),
+                Text(subtitle, style: const TextStyle(color: Color(0xFF91A0B5), height: 1.4)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

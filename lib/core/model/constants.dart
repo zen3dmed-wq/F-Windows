@@ -3,15 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:hiddify/utils/utils.dart';
 
 abstract class Constants {
-  static const appName = "Hiddify";
-  static const githubUrl = "https://github.com/hiddify/hiddify-next";
-  static const licenseUrl = "https://github.com/hiddify/hiddify-next?tab=License-1-ov-file#readme";
-  static const githubReleasesApiUrl = "https://api.github.com/repos/hiddify/hiddify-next/releases";
-  static const githubLatestReleaseUrl = "https://github.com/hiddify/hiddify-app/releases/latest";
-  static const appCastUrl = "https://raw.githubusercontent.com/hiddify/hiddify-next/main/appcast.xml";
-  static const telegramChannelUrl = "https://t.me/hiddify";
-  static const privacyPolicyUrl = "https://hiddify.com/privacy-policy/";
-  static const termsAndConditionsUrl = "https://hiddify.com/terms/";
+  static const appName = "Flint";
+  static const githubUrl = "https://github.com/zen3dmed-wq/F-Windows";
+  static const licenseUrl = "https://github.com/hiddify/hiddify-app";
+  static const githubReleasesApiUrl = "https://api.github.com/repos/zen3dmed-wq/F-Windows/releases";
+  static const githubLatestReleaseUrl = "https://github.com/zen3dmed-wq/F-Windows/releases/latest";
+  static const appCastUrl = "";
+  static const telegramChannelUrl = "";
+  static const privacyPolicyUrl = "";
+  static const termsAndConditionsUrl = "";
   static const cfWarpPrivacyPolicy = "https://www.cloudflare.com/application/privacypolicy/";
   static const cfWarpTermsOfService = "https://www.cloudflare.com/application/terms/";
 }
@@ -26,7 +26,6 @@ abstract class AddProfileModalConst {
   static const fixBtnsItemCountDesktop = 3;
   static const navBarGap = 16.0;
   static const navBarBottomGap = 4.0;
-  //switch default height
   static const navBarcontentHeight = 32.0;
   static const navBarHeight = navBarGap + navBarBottomGap + navBarcontentHeight;
 }
@@ -103,7 +102,6 @@ abstract class ChainConst {
     if (PlatformUtils.isAndroid) return Icons.phone_android;
     if (PlatformUtils.isIOS) return Icons.phone_iphone;
     if (PlatformUtils.isWeb) return Icons.web;
-    // Desktops
     return Icons.laptop;
   }
 
@@ -112,6 +110,5 @@ abstract class ChainConst {
   static const warpColor = Color(0xFFF6821F);
   static const psiphonColor = Color(0xFFD52027);
   static const profileColor = Color(0xFF3282B8);
-
   static const finalIpDuration = Duration(milliseconds: 500);
 }
