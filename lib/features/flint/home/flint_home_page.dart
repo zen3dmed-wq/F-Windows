@@ -399,7 +399,7 @@ class _FlintCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(18),
         child: Container(
-          minHeight: 86,
+          constraints: const BoxConstraints(minHeight: 86),
           padding: const EdgeInsets.all(17),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
