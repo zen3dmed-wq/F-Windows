@@ -1,0 +1,60 @@
+name: Flint Windows
+
+on:
+  push:
+    branches:
+      - flint-full-ui-v04
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: '3.38.5'
+  IS_GITHUB_ACTIONS: 1
+  CHANNEL: dev
+  SENTRY_DSN: ""
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2.21.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          make windows-install-deps
+          "$HOME/.pub-cache/bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Prepare Windows
+        shell: pwsh
+        run: make windows-prepare
+
+      - name: Build Flint Windows
+        shell: pwsh
+        run: make windows-flint-release
+
+      - name: Collect Flint packages
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path out -Force | Out-Null
+          Get-ChildItem -Path dist -Recurse -Filter "*.exe" | ForEach-Object {
+            Copy-Item $_.FullName "out/Flint-Windows-Setup-x64.exe" -Force
+          }
+          Get-ChildItem -Path dist -Recurse -Filter "*.zip" | ForEach-Object {
+            Copy-Item $_.FullName "out/Flint-Windows-Portable-x64.zip" -Force
+          }
+          Get-ChildItem out
+
+      - name: Upload Flint Windows
+        uses: actions/upload-artifact@v6
+        with:
+          name: Flint-Windows
+          path: out/*
+          retention-days: 7
