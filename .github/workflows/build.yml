@@ -265,7 +265,15 @@ jobs:
           make ${{ matrix.platform }}-prepare
 
 
+      - name: Build Windows
+        if: ${{ matrix.platform == 'windows' }}
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        run: |
+          make windows-flint-release
+
       - name: Build ${{ matrix.platform }}
+        if: ${{ matrix.platform != 'windows' }}
         env:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |

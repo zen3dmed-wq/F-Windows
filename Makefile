@@ -286,6 +286,8 @@ android-aab-release:
 
 windows-release: windows-zip-release windows-exe-release windows-msix-release
 
+windows-flint-release: windows-zip-release windows-exe-release
+
 windows-zip-release:
 	fastforge package \
 	  --platform windows \
