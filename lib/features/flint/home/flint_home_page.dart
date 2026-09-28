@@ -8,6 +8,13 @@ import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
 import 'package:hiddify/features/settings/notifier/config_option/config_option_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import '../api/flint_backend_api.dart';
+import '../flint_config.dart';
+import '../ru_direct/flint_ru_direct_bridge.dart';
+import '../subscription/backend_subscription.dart';
+import '../subscription/flint_sessions_service.dart';
+import '../subscription/flint_subscription_bridge.dart';
+
 class FlintHomePage extends HookConsumerWidget {
   const FlintHomePage({super.key});
 
@@ -19,6 +26,11 @@ class FlintHomePage extends HookConsumerWidget {
     final delay = activeProxy.valueOrNull?.urlTestDelay ?? 0;
     final requiresReconnect =
         ref.watch(configOptionNotifierProvider).valueOrNull;
+
+    final api = FlintBackendApi();
+    final subscriptionBridge = FlintSubscriptionBridge(api);
+    final sessionsService = FlintSessionsService(api);
+    final ruDirect = FlintRuDirectBridge(api);
 
     final isConnected = switch (connectionStatus) {
       AsyncData(value: Connected()) => true,
@@ -35,10 +47,12 @@ class FlintHomePage extends HookConsumerWidget {
     Future<void> handleConnection() async {
       switch (connectionStatus) {
         case AsyncData(value: Connected()) when requiresReconnect == true:
-          final activeProfile = await ref.read(activeProfileProvider.future);
+          final activeProfile =
+              await ref.read(activeProfileProvider.future);
           await ref
               .read(connectionNotifierProvider.notifier)
               .reconnect(activeProfile);
+
         case AsyncData(value: Disconnected()) || AsyncError():
           if (ref.read(activeProfileProvider).valueOrNull == null) {
             await ref
@@ -57,10 +71,12 @@ class FlintHomePage extends HookConsumerWidget {
                 .read(connectionNotifierProvider.notifier)
                 .toggleConnection();
           }
+
         case AsyncData(value: Connected()):
           await ref
               .read(connectionNotifierProvider.notifier)
               .toggleConnection();
+
         default:
           break;
       }
@@ -79,18 +95,113 @@ class FlintHomePage extends HookConsumerWidget {
       AsyncData(value: Connected()) when requiresReconnect == true =>
         'Переподключить',
       AsyncData(value: Connected()) => 'Отключиться',
-      AsyncData(value: Disconnected()) || AsyncError() => 'Подключиться',
+      AsyncData(value: Disconnected()) || AsyncError() =>
+        'Подключиться',
       _ => 'Подключение…',
     };
 
     final guardText = switch (connectionStatus) {
-      AsyncData(value: Connected()) when delay > 0 && delay < 65000 =>
+      AsyncData(value: Connected())
+          when delay > 0 && delay < 65000 =>
         'Защищено • $delay мс',
       AsyncData(value: Connected()) => 'Защищено',
       AsyncData(value: Disconnected()) => 'Не подключено',
       AsyncError() => 'Ошибка соединения',
       _ => 'Устанавливаем соединение…',
     };
+
+    Future<void> showApiNotConfigured() async {
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => const AlertDialog(
+          title: Text('Flint API не настроен'),
+          content: Text(
+            'Для тестовой сборки задайте '
+            'FLINT_API_BASE_URL и FLINT_API_TOKEN.',
+          ),
+        ),
+      );
+    }
+
+    Future<void> installSubscription() async {
+      if (!FlintConfig.apiConfigured) {
+        await showApiNotConfigured();
+        return;
+      }
+
+      try {
+        await subscriptionBridge.installActiveSubscription(ref);
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Подписка Flint передана в Hiddify.',
+            ),
+          ),
+        );
+      } catch (e) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка подписки: $e')),
+        );
+      }
+    }
+
+    Future<void> toggleRuDirect() async {
+      if (!FlintConfig.apiConfigured &&
+          ruDirect.currentDomainCount(ref) == 0) {
+        await showApiNotConfigured();
+        return;
+      }
+
+      final currentlyEnabled = ruDirect.isEnabled(ref);
+
+      try {
+        if (currentlyEnabled) {
+          await ruDirect.setEnabled(ref, false);
+        } else {
+          await ruDirect.setEnabled(ref, true);
+        }
+
+        if (context.mounted) {
+          (context as Element).markNeedsBuild();
+        }
+      } catch (e) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('RU Direct: $e')),
+        );
+      }
+    }
+
+    Future<void> refreshRuDirect() async {
+      if (!FlintConfig.apiConfigured) {
+        await showApiNotConfigured();
+        return;
+      }
+
+      try {
+        final snapshot = await ruDirect.refreshAndApply(ref);
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'RU Direct обновлён: ${snapshot.domains.length} доменов',
+            ),
+          ),
+        );
+        (context as Element).markNeedsBuild();
+      } catch (e) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Не удалось обновить RU Direct: $e')),
+        );
+      }
+    }
+
+    final ruEnabled = ruDirect.isEnabled(ref);
+    final ruCount = ruDirect.currentDomainCount(ref);
 
     return Scaffold(
       body: SafeArea(
@@ -114,6 +225,7 @@ class FlintHomePage extends HookConsumerWidget {
                   style: theme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 36),
+
                 Center(
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 250),
@@ -134,6 +246,7 @@ class FlintHomePage extends HookConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 18),
+
                 Text(
                   statusText,
                   textAlign: TextAlign.center,
@@ -142,6 +255,7 @@ class FlintHomePage extends HookConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 20),
+
                 SizedBox(
                   height: 58,
                   child: FilledButton(
@@ -150,28 +264,89 @@ class FlintHomePage extends HookConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 14),
+
                 _GuardCard(
                   connected: isConnected,
                   busy: isBusy,
                   text: guardText,
                 ),
                 const SizedBox(height: 18),
-                const _FlintMenuTile(
+
+                FutureBuilder<FlintBackendSubscription?>(
+                  future: FlintConfig.apiConfigured
+                      ? subscriptionBridge.loadActiveSubscription()
+                      : null,
+                  builder: (context, snapshot) {
+                    final sub = snapshot.data;
+                    return _FlintMenuTile(
+                      icon: Icons.workspace_premium_rounded,
+                      title: 'Подписка',
+                      subtitle: !FlintConfig.apiConfigured
+                          ? 'API не настроен'
+                          : sub == null
+                              ? 'Нажмите для загрузки'
+                              : _subscriptionText(sub),
+                      onTap: installSubscription,
+                    );
+                  },
+                ),
+
+                _FlintMenuTile(
                   icon: Icons.public_rounded,
                   title: 'Страна',
-                  subtitle: 'Выбор сервера',
+                  subtitle: 'Используется активный профиль Hiddify',
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Выбор страны через proxy selector '
+                          'подключим следующим пакетом.',
+                        ),
+                      ),
+                    );
+                  },
                 ),
-                const _FlintMenuTile(
+
+                _FlintMenuTile(
                   icon: Icons.alt_route_rounded,
                   title: 'RU Direct',
-                  subtitle: 'Белые списки',
-                  badge: 'ВКЛ',
+                  subtitle: ruCount > 0
+                      ? '$ruCount доменов'
+                      : 'Белые списки',
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Обновить',
+                        onPressed: refreshRuDirect,
+                        icon: const Icon(Icons.refresh_rounded),
+                      ),
+                      Switch(
+                        value: ruEnabled,
+                        onChanged: (_) => toggleRuDirect(),
+                      ),
+                    ],
+                  ),
+                  onTap: refreshRuDirect,
                 ),
-                const _FlintMenuTile(
-                  icon: Icons.family_restroom_rounded,
-                  title: 'Семейная подписка',
-                  subtitle: 'Устройства 0 / 3',
+
+                FutureBuilder<List<FlintSession>>(
+                  future: FlintConfig.apiConfigured
+                      ? sessionsService.load()
+                      : null,
+                  builder: (context, snapshot) {
+                    final count = snapshot.data?.length ?? 0;
+                    return _FlintMenuTile(
+                      icon: Icons.family_restroom_rounded,
+                      title: 'Семейная подписка',
+                      subtitle: FlintConfig.apiConfigured
+                          ? 'Устройства $count / 3'
+                          : 'API не настроен',
+                      onTap: () {},
+                    );
+                  },
                 ),
+
                 const _FlintMenuTile(
                   icon: Icons.support_agent_rounded,
                   title: 'Онлайн поддержка',
@@ -183,6 +358,21 @@ class FlintHomePage extends HookConsumerWidget {
         ),
       ),
     );
+  }
+
+  static String _subscriptionText(FlintBackendSubscription sub) {
+    final tariff = sub.tariff?.trim();
+    final expires = sub.expiresAt;
+
+    final parts = <String>[
+      if (tariff != null && tariff.isNotEmpty) tariff,
+      if (expires != null)
+        'до ${expires.day.toString().padLeft(2, '0')}.'
+            '${expires.month.toString().padLeft(2, '0')}.'
+            '${expires.year}',
+    ];
+
+    return parts.isEmpty ? 'Активна' : parts.join(' • ');
   }
 }
 
@@ -243,13 +433,15 @@ class _FlintMenuTile extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.subtitle,
-    this.badge,
+    this.onTap,
+    this.trailing,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
-  final String? badge;
+  final VoidCallback? onTap;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -258,26 +450,9 @@ class _FlintMenuTile extends StatelessWidget {
         leading: Icon(icon),
         title: Text(title),
         subtitle: Text(subtitle),
-        trailing: badge == null
-            ? const Icon(Icons.chevron_right_rounded)
-            : Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 9,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primaryContainer,
-                ),
-                child: Text(
-                  badge!,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
+        trailing:
+            trailing ?? const Icon(Icons.chevron_right_rounded),
+        onTap: onTap,
       ),
     );
   }
