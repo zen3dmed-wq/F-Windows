@@ -67,11 +67,11 @@ jobs:
             -alias flint \
             -keyalg RSA -keysize 2048 -validity 3650 \
             -dname "CN=Flint Android Test,O=Flint,C=RU"
-          cat > android/key.properties <<'EOF'
+          cat > android/key.properties <<EOF
           storePassword=flinttest123
           keyPassword=flinttest123
           keyAlias=flint
-          storeFile=flint-test.jks
+          storeFile=$(pwd)/android/flint-test.jks
           EOF
 
       - name: Prepare Android
