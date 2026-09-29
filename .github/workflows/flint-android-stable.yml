@@ -78,7 +78,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          CHANNEL=dev make android-apk-prepare
+          CHANNEL=prod make android-apk-prepare
 
       - name: Build release APKs
         shell: bash
