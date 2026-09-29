@@ -18,7 +18,7 @@ permissions:
 
 env:
   FLUTTER_VERSION: '3.38.5'
-  CHANNEL: 'dev'
+  APP_CHANNEL: 'dev'
   IS_GITHUB_ACTIONS: '1'
 
 jobs:
@@ -78,7 +78,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          make android-apk-prepare
+          CHANNEL=dev make android-apk-prepare
 
       - name: Build release APKs
         shell: bash
